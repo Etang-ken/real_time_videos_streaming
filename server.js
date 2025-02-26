@@ -1,5 +1,4 @@
 const fs = require('fs-extra')
-const ffmpeg = require('fluent-ffmpeg')
 const path = require('path')
 const { processChunks } = require('./new_server')
 const WebSocket = require('ws')
@@ -7,12 +6,12 @@ const express = require('express')
 const rangeParser = require('range-parser')
 // const chokidar = require('chokidar')
 require('dotenv').config()
-const { spawn, exec } = require('child_process')
+const { spawn } = require('child_process')
 
 const app = express()
 const PORT = 3001
 const VIDEO_URL = 'https://download.ted.com/talks/SirKenRobinson_2006-480p.mp4' // Change this
-// const streamURL = 'udp://127.0.0.1:1236'
+// const streamURL = 'https://www.youtube.com/watch?v=iEpJwprxDdk'
 const streamURL = 'rtp://127.0.0.1:1234'
 // const streamURL = 'https://www.youtube.com/watch?v=iEpJwprxDdk/life'
 // const streamURL = 'rtsp://localhost:8554/live' // Use http://127.0.0.1:8080 for HTTP stream
@@ -56,8 +55,7 @@ let isProcessing = false;
 const processStream = async () => {
   // const chunk = `chunk_${chunkIndex}.mp4`
   // const outputFile = path.join(OUTPUT_FOLDER, chunk)
-  const segmentFile =
-    '/Volumes/Macintosh HD/AVNGroup/yuri/realtime-translation/be/chunks/chunk_%03d.mp4'
+  const segmentFile = path.join(OUTPUT_FOLDER, 'chunk_%03d.mp4');
 
   const ffmpegProcess = spawn('ffmpeg', [
     '-i',
@@ -113,9 +111,9 @@ const processQueue = async (ws, language) => {
 
   isProcessing = true;
   const chunk = chunksQueue.shift();
-  await processChunks(ws, chunk, language, chunkIndex);
+  // await processChunks(ws, chunk, language, chunkIndex);
   isProcessing = false;
-  // chunkIndex++
+  chunkIndex++
 
   // Process the next chunk in the queue
   processQueue(ws, language);

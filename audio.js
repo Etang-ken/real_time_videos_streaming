@@ -27,7 +27,7 @@ const mergeAudioWithVideo = (videoChunk, translatedAudio, outputVideo) => {
 const translateAudio = async (
   ws,
   language,
-  filePath,
+  audioFilePath,
   translatedAudioPath,
   videoChunkPath,
   finalVideoPath,
@@ -39,7 +39,7 @@ const translateAudio = async (
     const outputRawFile = `./audios/translated_audio_${chunkIndex}.raw`
 
     // Convert the audio to WAV format
-    const command = `ffmpeg -i "${filePath}" -ac 1 -ar 24000 -sample_fmt s16 "${tempWavPath}" -y`
+    const command = `ffmpeg -i "${audioFilePath}" -ac 1 -ar 24000 -sample_fmt s16 "${tempWavPath}" -y`
 
     try {
       execSync(command, { encoding: 'utf-8' })
@@ -76,7 +76,8 @@ const translateAudio = async (
       type: 'response.create',
       response: {
         modalities: ['audio', 'text'],
-        instructions: `Translate this audio to ${language}. Please choose voice  whe tranlating to ${language} based on the gender or age group talking.`
+        instructions: `Translate the spoken words in this audio to ${language}.`
+        // instructions: `Transcribe and translate the spoken words in this audio stream to ${language} while maintaining the speaker’s gender and approximate age in the translated voice. Ignore background speech and other non-verbal sounds from translation, but preserve all background sounds, music, and ambient noise in the final output..`
         // voice: 'alloy',
       }
     }
@@ -136,19 +137,25 @@ const translateAudio = async (
       if (
         serverEvent.type === 'response.done' &&
         serverEvent.response.status === 'incomplete'
-        //  &&
-        // serverEvent.response.status_details.reason === 'max_output_tokens'
       ) {
-        console.error(
-          'Max output tokens reached. Retrying with smaller audio chunk...'
-        )
-        ws.off('message', handleMessage)
-        // if (retryCount < MAX_RETRIES) {
-        //   retryCount++
-        //   ws.on('message', handleMessage)
-        // } else {
+        if (
+          serverEvent.response.status_details.reason === 'max_output_tokens'
+        ) {
+          console.error(
+            'Max output tokens reached. Retrying with smaller audio chunk...'
+          )
+          ws.off('message', handleMessage)
+          // if (retryCount < MAX_RETRIES) {
+          //   retryCount++
+          //   ws.on('message', handleMessage)
+          // } else {
           reject(new Error('Max output tokens reached.'))
-        // }
+          // }
+        } else if (
+          serverEvent.response.status_details.reason === 'content_filter'
+        ) {
+
+        }
       }
 
       // Handle session expired error
@@ -169,7 +176,7 @@ const translateAudio = async (
         //   retryCount++
         //   ws.on('message', handleMessage)
         // } else {
-          reject(new Error('Max output tokens reached.'))
+        reject(new Error('Max output tokens reached.'))
         // }
         reject(new Error('Session expired.'))
       }
@@ -221,7 +228,7 @@ const translateAudio = async (
 // const translateAudio = async (
 //   ws,
 //   language,
-//   filePath,
+//   audioFilePath,
 //   translatedAudioPath,
 //   videoChunkPath,
 //   finalVideoPath,
@@ -233,7 +240,7 @@ const translateAudio = async (
 //     const outputRawFile = `./audios/translated_audio_${chunkIndex}.raw`;
 
 //     // Convert the audio to WAV format
-//     const command = `ffmpeg -i "${filePath}" -ac 1 -ar 24000 -sample_fmt s16 "${tempWavPath}" -y`;
+//     const command = `ffmpeg -i "${audioFilePath}" -ac 1 -ar 24000 -sample_fmt s16 "${tempWavPath}" -y`;
 
 //     try {
 //       execSync(command, { encoding: 'utf-8' });
@@ -338,14 +345,14 @@ const translateAudio = async (
 // const translateAudio = async (
 //   ws,
 //   language,
-//   filePath,
+//   audioFilePath,
 //   translatedAudioPath,
 //   videoChunkPath,
 //   finalVideoPath,
 //   tempWavPath,
 //   chunkIndex
 // ) => {
-//   const command = `ffmpeg -i "${filePath}" -ac 1 -ar 24000 -sample_fmt s16 "${tempWavPath}" -y`
+//   const command = `ffmpeg -i "${audioFilePath}" -ac 1 -ar 24000 -sample_fmt s16 "${tempWavPath}" -y`
 
 //   try {
 //     const output = execSync(command, { encoding: 'utf-8' }) // Capture stdout
@@ -428,7 +435,7 @@ const translateAudio = async (
 //       translateAudio(
 //         ws,
 //         language,
-//         filePath,
+//         audioFilePath,
 //         translatedAudioPath,
 //         videoChunkPath,
 //         finalVideoPath,
