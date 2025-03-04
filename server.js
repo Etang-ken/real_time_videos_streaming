@@ -20,7 +20,7 @@ const streamURL = 'rtp://127.0.0.1:1234'
 // const OUTPUT_FOLDER = path.join(__dirname, "segments");
 const OUTPUT_FOLDER = path.join(__dirname, 'chunks')
 const OUTPUT_FOLDER_Fr = path.join(__dirname, 'chunks/french')
-const CHUNK_DURATION = 20 // Seconds
+const CHUNK_DURATION = '10' // Seconds
 const OVERLAP = 1
 const url =
   'wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17'
@@ -67,7 +67,7 @@ const processStream = async () => {
     '-f',
     'segment',
     '-segment_time',
-    '15',
+    CHUNK_DURATION,
     '-segment_format_options',
     'movflags=+faststart',
     '-reset_timestamps',
@@ -75,18 +75,6 @@ const processStream = async () => {
     segmentFile
   ])
 
-  //   const command = `ffmpeg -i "${streamURL}" -c copy -flags +global_header -f segment -segment_time 20 -segment_format_options movflags=+faststart -reset_timestamps 1 "${segmentFile}"`;
-
-  // exec(command, (error, stdout, stderr) => {
-  //   if (error) {
-  //     console.error(`Error executing FFmpeg: ${error.message}`);
-  //     return;
-  //   }
-  //   if (stderr) {
-  //     console.error(`FFmpeg stderr: ${stderr}`);
-  //   }
-  //   console.log(`FFmpeg stdout: ${stdout}`);
-  // });
 
   ffmpegProcess.stdout.on('data', (data) => {
     console.log(`FFmpeg Output: ${data}`)
@@ -111,9 +99,9 @@ const processQueue = async (ws, language) => {
 
   isProcessing = true;
   const chunk = chunksQueue.shift();
-  // await processChunks(ws, chunk, language, chunkIndex);
+  await processChunks(ws, chunk, language, chunkIndex);
   isProcessing = false;
-  chunkIndex++
+  // chunkIndex++
 
   // Process the next chunk in the queue
   processQueue(ws, language);
@@ -130,36 +118,6 @@ fs.watch(OUTPUT_FOLDER, { persistent: true }, (eventType, filename) => {
 });
 
 
-// const checkAndProcessChunks = async () => {
-//   while (chunksQueue.length > 3) {
-//     const chunk = chunksQueue.shift()
-//     console.log(`🚀 Processing chunk: ${chunk}`)
-//     await processChunks(ws, chunk, 'french', chunkIndex)
-//     chunkIndex++
-//   }
-// }
-
-// // Watch for new chunks
-// fs.watch(OUTPUT_FOLDER, { persistent: true }, (eventType, filename) => {
-//   if (eventType === 'rename' && filename.endsWith('.mp4')) {
-//     const chunkPath = path.join(OUTPUT_FOLDER, filename)
-//     console.log(`🆕 New chunk detected: ${chunkPath}`)
-//     chunksQueue.push(filename)
-//     checkAndProcessChunks() // Process immediately
-//   }
-// })
-
-// const translateAudio = async () => {
-//   while (chunkIndex !== 34) {
-
-//     const chunk =
-//       chunkIndex > 9 ? `chunk_0${chunkIndex}.mp4` : `chunk_00${chunkIndex}.mp4`
-//     await processChunks(ws, chunk, 'french', chunkIndex)
-//     chunkIndex++
-//   }
-// }
-
-// Start processing
 processStream()
 // translateAudio()
 

@@ -5,9 +5,9 @@ const path = require('path')
 
 const MAX_RETRIES = 3
 let retryCount = 0
+const INPUT_LIST_FILE = path.join(__dirname, 'file_lists/input_list.txt')
 
 const mergeAudioWithVideo = (videoChunk, translatedAudio, outputVideo) => {
-  console.log('extractAudi')
   return new Promise((resolve, reject) => {
     Ffmpeg()
       .input(videoChunk)
@@ -15,11 +15,23 @@ const mergeAudioWithVideo = (videoChunk, translatedAudio, outputVideo) => {
       .output(outputVideo)
       .videoCodec('copy')
       .audioCodec('aac')
-      .outputOptions(['-map 0:v:0', '-map 1:a:0', '-shortest'])
+      .outputOptions(['-map 0:v:0', '-map 1:a:0', '-shortest', '-err_detect ignore_err'])
       .on('end', () => {
-        resolve(outputVideo)
+        console.log('Merged Video: ', outputVideo)
+        return resolve(outputVideo)
       })
-      .on('error', (err) => reject(err))
+      .on('error', (err) => {
+        console.error('Merged Video error: ', err)
+        if (err.message.includes('ffmpeg exited with code 187')) {
+          console.log(
+            'Returning original video due to audio merge failure:',
+            videoChunk
+          )
+          fs.copyFileSync(videoChunk, outputVideo)
+        }
+
+        reject(err) //
+      })
       .run()
   })
 }
@@ -36,7 +48,8 @@ const translateAudio = async (
 ) => {
   return new Promise((resolve, reject) => {
     // Use a unique outputRawFile for each translation request
-    const outputRawFile = `./audios/translated_audio_${chunkIndex}.raw`
+    const outputRawFile = `./audios/raw/translated_audio_${chunkIndex}.raw`
+    const entry = `file '${finalVideoPath}'\n`
 
     // Convert the audio to WAV format
     const command = `ffmpeg -i "${audioFilePath}" -ac 1 -ar 24000 -sample_fmt s16 "${tempWavPath}" -y`
@@ -51,7 +64,6 @@ const translateAudio = async (
 
     // Read the converted file as base64
     const audioBuffer = fs.readFileSync(tempWavPath)
-    console.log(`Audio size: ${audioBuffer.length} bytes`)
     const base64Audio = audioBuffer.toString('base64')
 
     // Send the audio to the WebSocket for translation
@@ -91,15 +103,23 @@ const translateAudio = async (
     // Unique event handler for this translation request
     const handleMessage = (message) => {
       const serverEvent = JSON.parse(message.toString())
-      console.log('WebSocket Message:', serverEvent)
+      console.log('Websocket Message:', serverEvent)
 
       if (serverEvent.type === 'response.audio.delta' && serverEvent.delta) {
         receivedAudioChunks.push(serverEvent.delta)
-        console.log(`Received audio chunk: ${serverEvent.delta.length} bytes`)
+      }
+      if (serverEvent.type === 'response.done') {
+        // Append the file path to input.txt
+        // fs.appendFileSync(INPUT_LIST_FILE, entry, 'utf8')
+        // fs.appendFileSync(`\nOutput Done: ${serverEvent} \n \n`,entry, 'utf8')
+        console.log('Path to file:', finalVideoPath)
+        console.log('Done Response:', serverEvent)
       }
 
       if (serverEvent.type === 'response.output_item.done') {
-        console.log('Translation complete. Writing file...')
+        console.log('Translation complete. Writing file... ')
+        // fs.appendFileSync(INPUT_LIST_FILE, entry, 'utf8')
+        // fs.appendFileSync(`\nDone: ${serverEvent}\n \n` ,entry, 'utf8')
         isTranslationComplete = true
 
         // Combine all audio chunks and write to file
@@ -154,7 +174,7 @@ const translateAudio = async (
         } else if (
           serverEvent.response.status_details.reason === 'content_filter'
         ) {
-
+          console.error('Content filter error...')
         }
       }
 
@@ -189,7 +209,7 @@ const translateAudio = async (
     const timeoutDuration = 60000 // 60 seconds timeout
     const timeout = setTimeout(() => {
       if (!isTranslationComplete) {
-        console.error('Translation incomplete. Retrying...')
+        // console.error('Translation incomplete. Retrying...')
         ws.off('message', handleMessage)
         reject(new Error('Translation incomplete.'))
       }

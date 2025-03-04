@@ -1,10 +1,11 @@
+// issue: once ffmpeg starts, it uses the initial .txt file input content and ignores updated content when .txt file is updated along with thatfor pregenerated file
 const fs = require('fs')
 const path = require('path')
 const { spawn } = require('child_process')
 const express = require('express')
 
 // const VIDEO_DIR = path.join(__dirname, 'chunks')
-const VIDEO_DIR = path.join(__dirname, "chunks/french");
+const VIDEO_DIR = path.join(__dirname, "chunks");
 const STREAM_DIR = path.join(__dirname, 'stream')
 const INPUT_LIST_FILE = path.join(__dirname, 'file_lists/input_list.txt')
 let filesAdded = false
@@ -25,14 +26,14 @@ function appendNewFilesToInputList() {
       fs.readFileSync(INPUT_LIST_FILE, 'utf8').split('\n').filter(Boolean)
     )
   }
-  // if (!filesAdded) {
-  //   for (let i = 0; i <= 2000; i++) {
-  //     const chunkName = `translated_chunk_${String(i).padStart(3, '0')}.mp4`
-  //     const chunkPath = path.join(VIDEO_DIR, chunkName)
-  //     chunkFiles.push(`file '${chunkPath}'`)
-  //   }
-  //   // filesAdded = true
-  // }
+  if (!filesAdded) {
+    for (let i = 0; i <= 2000; i++) {
+      const chunkName = `chunk_${String(i).padStart(3, '0')}.mp4`
+      const chunkPath = path.join(VIDEO_DIR, chunkName)
+      chunkFiles.push(`file ${chunkPath}`)
+    }
+    // filesAdded = true
+  }
   console.log('Files added successfully')
   // Write the list to input_list.txt
   fs.writeFileSync(INPUT_LIST_FILE, chunkFiles.join('\n') + '\n')
@@ -45,7 +46,7 @@ function appendNewFilesToInputList() {
 
   if (newEntries.length > 0) {
     fs.appendFileSync(INPUT_LIST_FILE, newEntries.join('\n') + '\n')
-    console.log('✅ Added new files to input_list.txt')
+    // console.log('✅ Added new files to input_list.txt')
     // start
   }
 }
@@ -62,8 +63,6 @@ function startFFmpeg() {
   ffmpegProcess = spawn('ffmpeg', [
     '-re',
     '-err_detect', 'ignore_err', 
-    '-fflags', 'discardcorrupt',
-    '-vsync', '0',   
     '-f',
     'concat',
     '-safe',
@@ -79,7 +78,7 @@ function startFFmpeg() {
     '-hls_time',
     '5',
     '-hls_list_size',
-    '10',
+    '20',
     '-hls_flags',
     'append_list',
     path.join(STREAM_DIR, 'stream.m3u8')
