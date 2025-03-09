@@ -6,6 +6,7 @@ const path = require('path')
 
 const { translateAudio } = require('./audio.js') // Import your translation logic
 const { exec } = require('child_process')
+// const { detectVoice } = require('./detect_voice.js')
 
 const outputFolder = path.join(__dirname, 'chunks') // Video chunks
 const audioFolder = path.join(__dirname, 'audios') // Translated audio files
@@ -13,7 +14,7 @@ const MAX_RETRIES = 3
 const extractAudio = (inputVideo, outputAudio) => {
   return new Promise((resolve, reject) => {
     if (!fs.existsSync(inputVideo)) {
-      return
+      return reject(new Error(`Input video file does not exist: ${inputVideo}`))
     }
     ffmpeg(inputVideo)
       .output(outputAudio)
@@ -25,19 +26,18 @@ const extractAudio = (inputVideo, outputAudio) => {
   })
 }
 
-async function extractBackgroundMusic(inputFilePath, outputFilePath) {
-  const cmd = `ffmpeg -i '${inputFilePath}' -af "afftdn=nf=-30" '${outputFilePath}'`
-
-  exec(cmd, (error, stdout, stderr) => {
-    if (error) {
-      console.error(`Error: ${error.message}`)
-      return
-    }
-    console.log(`Background music extracted successfully!`)
+function convertToPCM(inputFile, outputFile) {
+  return new Promise((resolve, reject) => {
+    const command = `ffmpeg -y -i "${inputFile}" -ac 1 -ar 16000 -sample_fmt s16 -acodec pcm_s16le "${outputFile}"`
+    exec(command, (error, stdout, stderr) => {
+      if (error) {
+        reject(new Error(`Error converting audio: ${stderr}`))
+      } else {
+        resolve(outputFile)
+      }
+    })
   })
 }
-
-// Merge translated audio back into the video
 
 // Process each video chunk: extract, translate, and merge audio
 const processChunks = async (ws, chunk, language, chunkIndex) => {
@@ -60,10 +60,10 @@ const processChunks = async (ws, chunk, language, chunkIndex) => {
     'original',
     chunk.replace('.mp4', '.aac')
   )
-  const bgAudioPath = path.join(
+  const pcmPath = path.join(
     audioFolder,
-    'bg_music',
-    chunk.replace('.mp4', '.aac')
+    'pcm_audio',
+    chunk.replace('.mp4', '.wav')
   )
   const translatedAudioPath = path.join(
     audioLanguageFolder,
@@ -75,18 +75,20 @@ const processChunks = async (ws, chunk, language, chunkIndex) => {
   try {
     // Extract audio
     await extractAudio(videoInput, audioPath)
-    await extractBackgroundMusic(audioPath, bgAudioPath)
+    // await convertToPCM(audioPath, pcmPath)
+    // await detectVoice(audioPath)
     // Translate audio
-    // await translateAudio(
-    //   ws,
-    //   language,
-    //   audioPath,
-    //   translatedAudioPath,
-    //   videoInput,
-    //   finalVideoPath,
-    //   convertedChunk,
-    //   chunkIndex
-    // )
+    await translateAudio(
+      ws,
+      language,
+      audioPath,
+      translatedAudioPath,
+      videoInput,
+      finalVideoPath,
+      convertedChunk,
+      pcmPath,
+      chunkIndex
+    )
 
     console.log(`Translation complete for chunk: ${chunk}`)
   } catch (error) {

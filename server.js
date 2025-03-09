@@ -4,26 +4,16 @@ const { processChunks } = require('./new_server')
 const WebSocket = require('ws')
 const express = require('express')
 const rangeParser = require('range-parser')
-// const chokidar = require('chokidar')
 require('dotenv').config()
 const { spawn } = require('child_process')
 
 const app = express()
 const PORT = 3001
-const VIDEO_URL = 'https://download.ted.com/talks/SirKenRobinson_2006-480p.mp4' // Change this
-// const streamURL = 'https://www.youtube.com/watch?v=iEpJwprxDdk'
 const streamURL = 'rtp://127.0.0.1:1234'
-// const streamURL = 'https://www.youtube.com/watch?v=iEpJwprxDdk/life'
-// const streamURL = 'rtsp://localhost:8554/live' // Use http://127.0.0.1:8080 for HTTP stream
-
-// ffmpeg -re -i /Volumes/"Macintosh HD"/AVNGroup/yuri/realtime-translation/be/my_stream/youtube_streams/stream.mp4 -c copy -f rtp_mpegts rtp://127.0.0.1:1234
-// const OUTPUT_FOLDER = path.join(__dirname, "segments");
 const OUTPUT_FOLDER = path.join(__dirname, 'chunks')
 const OUTPUT_FOLDER_Fr = path.join(__dirname, 'chunks/french')
 const CHUNK_DURATION = '10' // Seconds
-const OVERLAP = 1
-const url =
-  'wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17'
+const url = 'wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17'
 
 let ws
 const reconnectInterval = 3000 // 3 seconds delay before reconnecting
@@ -52,9 +42,8 @@ fs.ensureDirSync(OUTPUT_FOLDER)
 let chunkIndex = 0
 let chunksQueue = []
 let isProcessing = false;
+
 const processStream = async () => {
-  // const chunk = `chunk_${chunkIndex}.mp4`
-  // const outputFile = path.join(OUTPUT_FOLDER, chunk)
   const segmentFile = path.join(OUTPUT_FOLDER, 'chunk_%03d.mp4');
 
   const ffmpegProcess = spawn('ffmpeg', [
@@ -75,7 +64,6 @@ const processStream = async () => {
     segmentFile
   ])
 
-
   ffmpegProcess.stdout.on('data', (data) => {
     console.log(`FFmpeg Output: ${data}`)
   })
@@ -93,7 +81,6 @@ const processStream = async () => {
   })
 }
 
-
 const processQueue = async (ws, language) => {
   if (isProcessing || chunksQueue.length < 2) return;
 
@@ -101,7 +88,7 @@ const processQueue = async (ws, language) => {
   const chunk = chunksQueue.shift();
   await processChunks(ws, chunk, language, chunkIndex);
   isProcessing = false;
-  // chunkIndex++
+  chunkIndex++
 
   // Process the next chunk in the queue
   processQueue(ws, language);
@@ -117,9 +104,7 @@ fs.watch(OUTPUT_FOLDER, { persistent: true }, (eventType, filename) => {
   }
 });
 
-
 processStream()
-// translateAudio()
 
 // Serve stored segments
 app.use('/chunks/french', express.static(OUTPUT_FOLDER))

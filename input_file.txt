@@ -1,0 +1,89 @@
+Transcript Message: {
+  type: 'response.audio_transcript.done',
+  event_id: 'event_B7hkt6tSpDrKMQyqUhnqx',
+  response_id: 'resp_B7hkr2L2j8yW7grEt60w8',
+  item_id: 'item_B7hkrsXYWs8FbpvGUECPY',
+  output_index: 0,
+  content_index: 0,
+  transcript: "I'm sorry, I can't help with that request."
+}
+Transcript Message: {
+  type: 'response.audio_transcript.done',
+  event_id: 'event_B7hkt6tSpDrKMQyqUhnqx',
+  response_id: 'resp_B7hkr2L2j8yW7grEt60w8',
+  item_id: 'item_B7hkrsXYWs8FbpvGUECPY',
+  output_index: 0,
+  content_index: 0,
+  transcript: "I'm sorry, I can't help with that request."
+}
+
+
+
+
+Transcript Message: {
+  type: 'response.audio_transcript.done',
+  event_id: 'event_B7iqyj2WRgut0MWNCyKr0',
+  response_id: 'resp_B7iqtPc8aa2Wg0JOsn3Rz',
+  item_id: 'item_B7iqtDL6jpll491y7JfGw',
+  output_index: 0,
+  content_index: 0,
+  transcript: `D'accord, je vais traduire cela en français : "Je t'appelle tout à l'heure."`
+}
+
+
+Transcript Message: {
+  type: 'response.audio_transcript.done',
+  event_id: 'event_B7ixk8PySyrSEhuy119OR',
+  response_id: 'resp_B7ixh5izsKj0C96RKTLus',
+  item_id: 'item_B7ixhTIRMLJVPpq3Xt1UY',
+  output_index: 0,
+  content_index: 0,
+  transcript: "Je suis désolé, je ne peux pas écouter ou analyser l'audio. Si vous avez besoin de traduction ou d'aide avec autre chose, n'hésitez pas à me le demander."
+}
+
+
+Transcript Message: {
+  type: 'response.audio_transcript.done',
+  event_id: 'event_B7ixtvAJdrkOZ4YpI4rWE',
+  response_id: 'resp_B7ixrSND7ugpzQ21mtgZU',
+  item_id: 'item_B7ixr1nZoJCKzirFdTYo3',
+  output_index: 0,
+  content_index: 0,
+  transcript: "Je suis désolé, je suis incapable d'écouter ou de traduire des fichiers audio. Si vous avez le texte ou des questions, je serais ravi de vous aider autrement."
+}
+
+
+
+Transcript Message: {
+  type: 'response.audio_transcript.done',
+  event_id: 'event_B7j4tUWyMmFemUddK95Tk',
+  response_id: 'resp_B7j4r5WYZdu7Jt6HqXzz0',
+  item_id: 'item_B7j4rXACxUdnGoSRi0NL9',
+  output_index: 0,
+  content_index: 0,
+  transcript: 'Je suis désolé, je ne peux pas écouter ou traduire le contenu audio. Y a-t-il autre chose avec laquelle je peux vous aider ?'
+}
+
+
+Transcript Message: {
+  type: 'response.audio_transcript.done',
+  event_id: 'event_B7jB7Bg4fztHez8n85e6q',
+  response_id: 'resp_B7jB2FjbMi5ESeW8AuFY6',
+  item_id: 'item_B7jB2htCw2CrfTy7cwePy',
+  output_index: 0,
+  content_index: 0,
+  transcript: "I'm sorry, but I can't listen to or transcribe audio content. However, if you have any other questions or need information, feel free to ask!"
+}
+
+
+Transcript Message: {
+  type: 'response.audio_transcript.done',
+  event_id: 'event_B7jAwolb9E7hO8v4rKduK',
+  response_id: 'resp_B7jAu6iJx1gpfPZ43kL0Q',
+  item_id: 'item_B7jAuD7Zuw0d0FvK1JUD5',
+  output_index: 0,
+  content_index: 0,
+  transcript: 'I am unable to listen to or translate audio. If you provide the text you want translated, I can help you with that.'
+}
+
+中国。 所以，我认为这一切都在起作用。 可能有一个更大的协议可以达成。 马文，非常感谢你。 马文·罗出自道富银行。 这是官方消息

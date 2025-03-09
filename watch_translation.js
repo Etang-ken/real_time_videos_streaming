@@ -3,7 +3,6 @@ const path = require('path')
 const { spawn } = require('child_process')
 const express = require('express')
 
-// const VIDEO_DIR = path.join(__dirname, 'chunks')
 const VIDEO_DIR = path.join(__dirname, "chunks/french");
 const STREAM_DIR = path.join(__dirname, 'stream')
 const INPUT_LIST_FILE = path.join(__dirname, 'file_lists/input_list.txt')
@@ -14,6 +13,7 @@ if (!fs.existsSync(STREAM_DIR)) {
   fs.mkdirSync(STREAM_DIR, { recursive: true })
 }
 let ffmpegProcess = null
+
 // Function to update the input list dynamically without restarting FFmpeg
 function appendNewFilesToInputList() {
   let existingFiles = new Set()
@@ -25,17 +25,7 @@ function appendNewFilesToInputList() {
       fs.readFileSync(INPUT_LIST_FILE, 'utf8').split('\n').filter(Boolean)
     )
   }
-  // if (!filesAdded) {
-  //   for (let i = 0; i <= 2000; i++) {
-  //     const chunkName = `translated_chunk_${String(i).padStart(3, '0')}.mp4`
-  //     const chunkPath = path.join(VIDEO_DIR, chunkName)
-  //     chunkFiles.push(`file '${chunkPath}'`)
-  //   }
-  //   // filesAdded = true
-  // }
-  console.log('Files added successfully')
-  // Write the list to input_list.txt
-  fs.writeFileSync(INPUT_LIST_FILE, chunkFiles.join('\n') + '\n')
+
   const newFiles = fs.readdirSync(VIDEO_DIR)
       .filter(file => file.startsWith("translated_chunk_") && file.endsWith(".mp4"))
       .sort()
@@ -46,7 +36,6 @@ function appendNewFilesToInputList() {
   if (newEntries.length > 0) {
     fs.appendFileSync(INPUT_LIST_FILE, newEntries.join('\n') + '\n')
     console.log('✅ Added new files to input_list.txt')
-    // start
   }
 }
 
@@ -91,9 +80,6 @@ function startFFmpeg() {
   )
   ffmpegProcess.on('close', (code) => {
     console.log(`FFmpeg exited with code ${code}`)
-    // if(code === 254) {
-    //     startFFmpeg()
-    // }
   })
 
   return ffmpegProcess
