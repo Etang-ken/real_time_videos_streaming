@@ -87,3 +87,24 @@ Transcript Message: {
 }
 
 中国。 所以，我认为这一切都在起作用。 可能有一个更大的协议可以达成。 马文，非常感谢你。 马文·罗出自道富银行。 这是官方消息
+
+
+Transcript Message: {
+  type: 'response.audio_transcript.done',
+  event_id: 'event_B9T6np93sedvYd8eTzOW0',
+  response_id: 'resp_B9T6m0a9S8fq5shKadZr6',
+  item_id: 'item_B9T6mBWA7nHyp1MTi6gnB',
+  output_index: 0,
+  content_index: 0,
+  transcript: "La transcription n'est pas possible pour ce fichier audio."
+}
+
+Transcript Message: {
+  type: 'response.audio_transcript.done',
+  event_id: 'event_B9T6dxGiqlH08CbY7D3SJ',
+  response_id: 'resp_B9T6c1qahimt8WEw70CAp',
+  item_id: 'item_B9T6cLblDyDo5FLGnGici',
+  output_index: 0,
+  content_index: 0,
+  transcript: 'Je suis désolé, mais je ne peux pas transcrire ou traduire cette chanson.'
+}
