@@ -66,7 +66,7 @@ function setupLanguageStream(language) {
       '-err_detect',
       'ignore_err',
       '-fflags',
-      'discardcorrupt',
+      'discardcorrupt+genpts',
       '-vsync',
       '0',
       '-f',

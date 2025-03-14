@@ -5,7 +5,7 @@ const getMediaDuration = (filePath) => {
   return new Promise((resolve, reject) => {
     ffmpeg.ffprobe(filePath, (err, metadata) => {
       if (err) {
-        reject(err)
+        return
       } else {
         resolve(metadata.format.duration)
       }
@@ -14,6 +14,7 @@ const getMediaDuration = (filePath) => {
 }
 
 const mergeAudioWithVideo = async (
+  originalAudio,
   videoChunk,
   translatedAudio,
   outputVideo
@@ -26,8 +27,14 @@ const mergeAudioWithVideo = async (
       console.log(
         '⚠️ Translated audio is less than 5s. Storing original video instead.'
       )
-      fs.copyFileSync(videoChunk, outputVideo)
-      return outputVideo // Return original video
+      mergeAudioWithVideo(
+        originalAudio,
+        videoChunk,
+        originalAudio,
+        finalVideoPath
+      )
+      // await transcodeVideo(outputVideo, outputVideo);
+      return // Return original video
     }
 
     return new Promise((resolve, reject) => {
@@ -54,10 +61,20 @@ const mergeAudioWithVideo = async (
               'Returning original video due to audio merge failure:',
               videoChunk
             )
-            fs.copyFileSync(videoChunk, outputVideo)
+            // fs.copyFileSync(videoChunk, outputVideo);
+            mergeAudioWithVideo(
+              originalAudio,
+              videoChunk,
+              originalAudio,
+              finalVideoPath
+            )
+            // Transcode the copied video to the desired properties
+            // transcodeVideo(outputVideo, outputVideo)
+            //   .then(() => resolve(outputVideo))
+            //   .catch((err) => reject(err))
           }
 
-          reject(err) //
+          return
         })
         .run()
     })
@@ -67,7 +84,33 @@ const mergeAudioWithVideo = async (
   }
 }
 
-// const mergeAudioWithVideo = (videoChunk, translatedAudio, outputVideo) => {
+// Function to transcode video to desired properties
+const transcodeVideo = (inputVideo, outputVideo) => {
+  return new Promise((resolve, reject) => {
+    ffmpeg(inputVideo)
+      .output(outputVideo)
+      .videoCodec('libx264') // Use a specific video codec
+      .audioCodec('aac')
+      .outputOptions([
+        '-vf scale=1280:720', // Set resolution to 1280x720
+        '-r 30', // Set frame rate to 30 fps
+        '-b:v 1500k', // Set video bitrate to 1500 kbps
+        '-b:a 128k', // Set audio bitrate to 128 kbps
+        '-pix_fmt yuv420p' // Set pixel format
+      ])
+      .on('end', () => {
+        console.log(`✅ Transcoded Video: ${outputVideo}`)
+        resolve(outputVideo)
+      })
+      .on('error', (err) => {
+        console.error('❌ Transcoding Video error: ', err)
+        reject(err)
+      })
+      .run()
+  })
+}
+
+// const mergeAudioWithVideo originalAudio,= (videoChunk, translatedAudio, outputVideo) => {
 //   return new Promise((resolve, reject) => {
 //     ffmpeg()
 //       .input(videoChunk)
@@ -121,7 +164,13 @@ const translateAudio = async (
       console.error('❌ FFmpeg Error:', error.message)
       return reject(error)
     }
-
+    const processedOriginalAudio = `${audioFilePath.replace(
+      '.aac',
+      '_processed.aac'
+    )}`
+    execSync(
+      `ffmpeg -i "${audioFilePath}" -c:a aac -b:a 128k -ar 24000 -ac 1 "${processedOriginalAudio}" -y`
+    )
     const base64Audio = fs.readFileSync(tempWavPath).toString('base64')
     ws.send(
       JSON.stringify({
@@ -161,13 +210,22 @@ const translateAudio = async (
         ) {
           isIntranslatable = true
           console.log('⚠️ Non-Translatable Audio...')
+          // return mergeAudioWithVideo(originalAudio,
+          //   videoChunkPath,
+          //   audioFilePath,
+          //   finalVideoPath
+          // )
+
           return mergeAudioWithVideo(
+            processedOriginalAudio,
             videoChunkPath,
-            audioFilePath,
+            processedOriginalAudio,
             finalVideoPath
           )
         }
+        // return fs.copyFileSync(videoChunkPath, finalVideoPath)
       }
+
       if (serverEvent.type === 'response.output_item.done') {
         isTranslationComplete = true
         fs.writeFileSync(
@@ -180,6 +238,7 @@ const translateAudio = async (
               `ffmpeg -f s16le -ar 24000 -ac 1 -i "${outputRawFile}" -c:a aac -b:a 128k "${translatedAudioPath}" -y`
             )
             mergeAudioWithVideo(
+              processedOriginalAudio,
               videoChunkPath,
               translatedAudioPath,
               finalVideoPath
@@ -205,7 +264,12 @@ const translateAudio = async (
     const timeout = setTimeout(() => {
       if (!isTranslationComplete) {
         console.error('⏳ Translation timeout. Using original audio instead.')
-        mergeAudioWithVideo(videoChunkPath, audioFilePath, finalVideoPath)
+        mergeAudioWithVideo(
+          processedOriginalAudio,
+          videoChunkPath,
+          processedOriginalAudio,
+          finalVideoPath
+        )
           .then(resolve)
           .catch(reject)
         ws.off('message', handleMessage)
@@ -223,7 +287,7 @@ module.exports = { translateAudio }
 // const fs = require('fs')
 // const path = require('path')
 
-// const mergeAudioWithVideo = (videoChunk, translatedAudio, outputVideo) => {
+// const mergeAudioWithVideo originalAudio,= (videoChunk, translatedAudio, outputVideo) => {
 //   return new Promise((resolve, reject) => {
 //     ffmpeg()
 //       .input(videoChunk)
@@ -330,7 +394,7 @@ module.exports = { translateAudio }
 //         ) {
 //           isIntranslatable = true
 //           console.log('🚀🚀🚀-Non-Translated audio...')
-//           mergeAudioWithVideo(videoChunkPath, audioFilePath, finalVideoPath)
+//           mergeAudioWithVideo(originalAudio,videoChunkPath, audioFilePath, finalVideoPath)
 //         }
 //       }
 //       if (serverEvent.type === 'response.output_item.done') {
@@ -347,7 +411,7 @@ module.exports = { translateAudio }
 //               `ffmpeg -f s16le -ar 24000 -ac 1 -i "${outputRawFile}" -c:a aac -b:a 128k "${translatedAudioPath}" -y`
 //             )
 
-//             mergeAudioWithVideo(
+//             mergeAudioWithVideo(originalAudio,
 //               videoChunkPath,
 //               translatedAudioPath,
 //               finalVideoPath

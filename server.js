@@ -92,11 +92,11 @@ const processQueue = async () => {
   isProcessing = true
   const chunk = chunksQueue.shift()
 
-  setTimeout(() => {
-    languages.forEach((language) => {
-      setupLanguageStream(language)
-    })
-  }, 120000)
+  // setTimeout(() => {
+  //   languages.forEach((language) => {
+  //     setupLanguageStream(language)
+  //   })
+  // }, 120000)
 
   await Promise.all(
     languages.map((language) =>
@@ -120,36 +120,7 @@ processStream()
 
 app.use(express.static(STREAM_BASE_DIR))
 
-app.get('/:language', (req, res) => {
-  const language = req.params.language
-  res.send(`
-        <html>
-        <head><title>${language} Stream</title>
-        <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-        </head>
-        <body>
-            <h1>Streaming in ${language}</h1>
-            <video id="video" controls muted autoplay style="max-width: 800px;"></video>
-            <script>
-                var video = document.getElementById('video');
-                if (Hls.isSupported()) {
-                    var hls = new Hls();
-                    hls.loadSource('/${language}/stream.m3u8');
-                    hls.attachMedia(video);
-                    hls.on(Hls.Events.MANIFEST_PARSED, function() { video.play(); });
-                } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-                    video.src = '/${language}/stream.m3u8';
-                    video.addEventListener('loadedmetadata', function() { video.play(); });
-                }
-            </script>
-        </body>
-        </html>
-    `)
-})
-
-// app.listen(8080, () =>
-//   console.log('🎥 Server running at http://localhost:8080')
-// )
+/
 app.use('/chunks', express.static(OUTPUT_FOLDER))
 // app.use('/api', streamRoutes)
 
