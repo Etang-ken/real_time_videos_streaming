@@ -44,7 +44,7 @@ function setupLanguageStream(language) {
       )
     }
     if (!filesAdded) {
-      for (let i = 0; i <= 2000; i++) {
+      for (let i = 0; i <= 4000; i++) {
         const chunkName = `translated_chunk_${String(i).padStart(3, '0')}.mp4`
         const chunkPath = path.join(videoDir, chunkName)
         chunkFiles.push(`file '${chunkPath}'`)
@@ -112,6 +112,40 @@ function setupLanguageStream(language) {
     })
 
     // activeStreams.set(language, ffmpegProcess)
+  }
+
+  function removePreviousFiles(missingFile) {
+    let inputFiles = fs
+      .readFileSync(inputListFile, 'utf8')
+      .split('\n')
+      .filter(Boolean)
+  
+    const missingFilePath = `file '${path.join(videoDir, missingFile)}'`
+    const index = inputFiles.indexOf(missingFilePath)
+  
+    if (index === -1) {
+      console.log(`❌ Missing file ${missingFile} not found in the list.`)
+      return
+    }
+  
+    // Get all files before the missing one
+    // const filesToDelete = inputFiles.slice(0, index)
+  
+    // filesToDelete.forEach((fileEntry) => {
+    //   const filePath = fileEntry.replace(/^file '|'$/g, '') // Remove "file ''" wrapper
+    //   if (fs.existsSync(filePath)) {
+    //     fs.unlinkSync(filePath)
+    //     console.log(`🗑 Deleted: ${filePath}`)
+    //   }
+    // })
+  
+    // Update the file list, keeping only the remaining files
+    const remainingFiles = inputFiles.slice(index + 1)
+    fs.writeFileSync(inputListFile, remainingFiles.join('\n') + '\n')
+  
+    console.log('✅ Updated input_list.txt')
+  
+    startFFmpeg() // Restart FFmpeg with updated files
   }
 
   appendNewFilesToInputList()
@@ -243,91 +277,3 @@ module.exports = { setupLanguageStream }
 //   return ffmpegProcess
 // }
 
-// function removePreviousFiles(missingFile) {
-//   let inputFiles = fs
-//     .readFileSync(INPUT_LIST_FILE, 'utf8')
-//     .split('\n')
-//     .filter(Boolean)
-
-//   const missingFilePath = `file '${path.join(VIDEO_DIR, missingFile)}'`
-//   const index = inputFiles.indexOf(missingFilePath)
-
-//   if (index === -1) {
-//     console.log(`❌ Missing file ${missingFile} not found in the list.`)
-//     return
-//   }
-
-//   // Get all files before the missing one
-//   // const filesToDelete = inputFiles.slice(0, index)
-
-//   // filesToDelete.forEach((fileEntry) => {
-//   //   const filePath = fileEntry.replace(/^file '|'$/g, '') // Remove "file ''" wrapper
-//   //   if (fs.existsSync(filePath)) {
-//   //     fs.unlinkSync(filePath)
-//   //     console.log(`🗑 Deleted: ${filePath}`)
-//   //   }
-//   // })
-
-//   // Update the file list, keeping only the remaining files
-//   const remainingFiles = inputFiles.slice(index + 1)
-//   fs.writeFileSync(INPUT_LIST_FILE, remainingFiles.join('\n') + '\n')
-
-//   console.log('✅ Updated input_list.txt')
-
-//   startFFmpeg() // Restart FFmpeg with updated files
-// }
-
-// // Express server to serve HLS stream
-// const app = express()
-// app.use(express.static(STREAM_DIR))
-
-// app.get('/', (req, res) => {
-//   res.send(
-//     `<html>
-//         <head>
-//             <title>Live Stream</title>
-//             <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-//         </head>
-//         <body>
-//             <div style='display: flex; justify-content: space-between; flex-wrap: wrap; gap: 30px; width: 100%;'>
-//                 <div>
-//                     <h1>Original Stream</h1>
-//                    <video src="rtp://127.0.0.1:1234" controls muted autoplay style="max-width: 800px;"></video>
-//                 </div>
-//                 <div>
-//                     <h1>Translated Stream</h1>
-//                      <video id="video" controls muted autoplay style="max-width: 800px;"></video>
-//                 </div>
-
-//             </div>
-//             <script>
-//                 var video = document.getElementById('video');
-//                 if (Hls.isSupported()) {
-//                     var hls = new Hls();
-//                     hls.loadSource('/stream.m3u8'); // Load the stream
-//                     hls.attachMedia(video);
-//                     hls.on(Hls.Events.MANIFEST_PARSED, function() {
-//                         video.play();
-//                     });
-//                 } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-//                     video.src = '/stream.m3u8';
-//                     video.addEventListener('loadedmetadata', function() {
-//                         video.play();
-//                     });
-//                 }
-//             </script>
-//         </body>
-//         </html>`
-//   )
-// })
-
-// app.listen(8080, () =>
-//   console.log('🎥 Server running at http://localhost:8080')
-// )
-
-// // Start FFmpeg initially
-// appendNewFilesToInputList()
-// startFFmpeg()
-
-// // Check for new files every 5 seconds and append them to the list
-// // appendNewFilesToInputList()

@@ -27,12 +27,7 @@ const mergeAudioWithVideo = async (
       console.log(
         '⚠️ Translated audio is less than 5s. Storing original video instead.'
       )
-      mergeAudioWithVideo(
-        originalAudio,
-        videoChunk,
-        originalAudio,
-        finalVideoPath
-      )
+      mergeAudioWithVideo(originalAudio, videoChunk, originalAudio, outputVideo)
       // await transcodeVideo(outputVideo, outputVideo);
       return // Return original video
     }
@@ -66,8 +61,9 @@ const mergeAudioWithVideo = async (
               originalAudio,
               videoChunk,
               originalAudio,
-              finalVideoPath
+              outputVideo
             )
+            return
             // Transcode the copied video to the desired properties
             // transcodeVideo(outputVideo, outputVideo)
             //   .then(() => resolve(outputVideo))
@@ -109,40 +105,6 @@ const transcodeVideo = (inputVideo, outputVideo) => {
       .run()
   })
 }
-
-// const mergeAudioWithVideo originalAudio,= (videoChunk, translatedAudio, outputVideo) => {
-//   return new Promise((resolve, reject) => {
-//     ffmpeg()
-//       .input(videoChunk)
-//       .input(translatedAudio)
-//       .output(outputVideo)
-//       .videoCodec('copy')
-//       .audioCodec('aac')
-//       .outputOptions(['-map 0:v:0', '-map 1:a:0', '-shortest'])
-//       .on('end', () => {
-//         console.log(`✅ Merged Video: ${outputVideo}`)
-//         resolve(outputVideo)
-//       })
-//       .on('error', (err) => {
-//         // console.error('❌ Merging Video Error:', err);
-//         // console.log('⚠️ Returning original video due to audio merge failure:', videoChunk);
-//         // fs.copyFileSync(videoChunk, outputVideo);
-//         // reject(err);
-
-//         console.error('❌Merged Video error: ', err)
-//         if (err.message.includes('ffmpeg exited with code 187')) {
-//           console.log(
-//             'Returning original video due to audio merge failure:',
-//             videoChunk
-//           )
-//           fs.copyFileSync(videoChunk, outputVideo)
-//         }
-
-//         reject(err) //
-//       })
-//       .run()
-//   })
-// }
 
 const translateAudio = async (
   ws,
@@ -199,14 +161,17 @@ const translateAudio = async (
 
     const handleMessage = (message) => {
       const serverEvent = JSON.parse(message.toString())
+      // console.log('✅ Server Event: ', serverEvent)
+      
       if (serverEvent.type === 'response.audio.delta' && serverEvent.delta)
         receivedAudioChunks.push(serverEvent.delta)
       if (serverEvent.type === 'response.audio_transcript.done') {
+        console.log('✅✅✅ Transcript Audio: ', serverEvent)
         if (
           serverEvent.transcript
             .toLowerCase()
             .includes('intranslatable audio') ||
-          serverEvent.transcript.length < 30
+          serverEvent.transcript.length < 15
         ) {
           isIntranslatable = true
           console.log('⚠️ Non-Translatable Audio...')
@@ -225,8 +190,11 @@ const translateAudio = async (
         }
         // return fs.copyFileSync(videoChunkPath, finalVideoPath)
       }
-
+      if (serverEvent.type === 'response.done') {
+        console.log('✅✅✅✅✅ Done Response: ', serverEvent)
+      }
       if (serverEvent.type === 'response.output_item.done') {
+        console.log('✅✅✅✅✅✅✅ Audio Output: ', serverEvent)
         isTranslationComplete = true
         fs.writeFileSync(
           outputRawFile,
@@ -258,6 +226,22 @@ const translateAudio = async (
           }
         }
       }
+
+      if (
+        serverEvent.type === 'error' &&
+        serverEvent.error.code === 'session_expired'
+      ) {
+        console.error('Session expired. Refreshing session...')
+        const refreshEvent = {
+          type: 'session.update',
+          session: {
+            instructions: 'Continue translation.'
+          }
+        }
+        ws.send(JSON.stringify(refreshEvent))
+        ws.off('message', handleMessage)
+        return
+      }
     }
 
     ws.on('message', handleMessage)
@@ -276,7 +260,32 @@ const translateAudio = async (
       }
     }, 60000)
 
-    resolve().finally(() => clearTimeout(timeout))
+    const sessionRefreshInterval = 25 * 60 * 1000 // 25 minutes
+    const sessionRefresh = setInterval(() => {
+      const refreshEvent = {
+        type: 'session.update',
+        session: {
+          instructions: 'Continue translation.'
+        }
+      }
+      ws.send(JSON.stringify(refreshEvent))
+      console.log('Session refreshed.')
+    }, sessionRefreshInterval)
+
+    const cleanup = () => {
+      clearTimeout(timeout)
+      clearInterval(sessionRefresh)
+      ws.off('message', handleMessage)
+    }
+
+    resolve()
+      .then(cleanup)
+      .catch((err) => {
+        cleanup()
+        reject(err)
+      })
+
+    // resolve().finally(() => clearTimeout(timeout))
   })
 }
 
