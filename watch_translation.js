@@ -45,7 +45,7 @@ function setupLanguageStream(language) {
     }
     if (!filesAdded) {
       for (let i = 0; i <= 4000; i++) {
-        const chunkName = `translated_chunk_${String(i).padStart(3, '0')}.mp4`
+        const chunkName = `translated_chunk_${String(i).padStart(3, '0')}_subtitled.mp4`
         const chunkPath = path.join(videoDir, chunkName)
         chunkFiles.push(`file '${chunkPath}'`)
       }
@@ -104,7 +104,9 @@ function setupLanguageStream(language) {
       if (match) {
         const missingFile = `translated_chunk_${match[2]}.mp4`
         console.log(`⚠️ Missing file detected: ${missingFile}`)
-        removePreviousFiles(missingFile)
+        setTimeout(() => {
+          removePreviousFiles(missingFile)
+        }, 20000)
       }
     })
     ffmpegProcess.on('close', (code) => {
@@ -119,18 +121,18 @@ function setupLanguageStream(language) {
       .readFileSync(inputListFile, 'utf8')
       .split('\n')
       .filter(Boolean)
-  
+
     const missingFilePath = `file '${path.join(videoDir, missingFile)}'`
     const index = inputFiles.indexOf(missingFilePath)
-  
+
     if (index === -1) {
       console.log(`❌ Missing file ${missingFile} not found in the list.`)
       return
     }
-  
+
     // Get all files before the missing one
     // const filesToDelete = inputFiles.slice(0, index)
-  
+
     // filesToDelete.forEach((fileEntry) => {
     //   const filePath = fileEntry.replace(/^file '|'$/g, '') // Remove "file ''" wrapper
     //   if (fs.existsSync(filePath)) {
@@ -138,13 +140,13 @@ function setupLanguageStream(language) {
     //     console.log(`🗑 Deleted: ${filePath}`)
     //   }
     // })
-  
+
     // Update the file list, keeping only the remaining files
     const remainingFiles = inputFiles.slice(index + 1)
     fs.writeFileSync(inputListFile, remainingFiles.join('\n') + '\n')
-  
+
     console.log('✅ Updated input_list.txt')
-  
+
     startFFmpeg() // Restart FFmpeg with updated files
   }
 
@@ -276,4 +278,3 @@ module.exports = { setupLanguageStream }
 
 //   return ffmpegProcess
 // }
-

@@ -8,6 +8,7 @@ const express = require('express')
 require('dotenv').config()
 const { spawn, exec } = require('child_process')
 const util = require('util')
+const execPromise = util.promisify(exec)
 const axios = require('axios')
 // const { setupLanguageStream } = require('./watch_translation')
 
@@ -27,7 +28,6 @@ let activeLanguages = new Set() // Use Set to avoid duplicates
 let chunkIndex = 0
 let chunksQueue = []
 let isProcessing = false
-let appExtraParams = {}
 
 fs.ensureDirSync(OUTPUT_FOLDER)
 
@@ -109,58 +109,38 @@ const startProcessingStream = async (streamURL) => {
   )
 }
 
-// Add this at the top with other requirements
+// Add this at the top with other requires
+const NodeMediaServer = require('node-media-server')
 
-const processQueue = async () => {
-  if (isProcessing || chunksQueue.length < 2) return
-
-  isProcessing = true
-  const chunk = chunksQueue.shift()
-  // const chunk = path.join(__dirname, 'chunks', chunksQueue.shift())
-  await Promise.all(
-    [...activeLanguages].map((language) =>
-      processChunks(wsConnections[language], chunk, language, appExtraParams)
-    )
-  )
-  isProcessing = false
-  chunkIndex++
-  processQueue() // Continue processing
+// Configure Node Media Server
+const nmsConfig = {
+  rtmp: {
+    port: 1935,
+    chunk_size: 60000,
+    gop_cache: true,
+    ping: 30,
+    ping_timeout: 60
+  },
+  http: {
+    port: 8000,
+    allow_origin: '*'
+  }
 }
 
-// Watch the output folder for new chunks
+const nms = new NodeMediaServer(nmsConfig)
+nms.run()
 
-fs.watch(OUTPUT_FOLDER, { persistent: true }, (eventType, filename) => {
-  if (eventType === 'rename' && filename.endsWith('.mp4')) {
-    chunksQueue.push(filename)
-    processQueue()
-  }
-})
 
-// Add after app.use(cors())
-// const STREAM_DIR = path.join(__dirname, 'stream')
-// app.use('/stream', (req, res, next) => {
-//   res.header('Access-Control-Allow-Origin', '*')
-//   res.header('Access-Control-Expose-Headers', 'Content-Length')
-//   next()
-// })
-
-// // Add MIME type overrides
-// express.static.mime.define({
-//   'application/vnd.apple.mpegurl': ['m3u8'],
-//   'video/MP2T': ['ts']
-// })
-// app.use('/stream', express.static(STREAM_DIR))
 
 // **Route: Start Processing (Initial Language Setup)**
 app.post('/start-processing', (req, res) => {
-  const { url, languages, extraParams } = req.body
+  const { url, languages } = req.body
   if (!url || !Array.isArray(languages) || languages.length === 0) {
     return res
       .status(400)
       .json({ error: 'Stream URL and languages are required' })
   }
   console.log('Process: ', url, languages)
-  appExtraParams = extraParams
   languages.forEach((lang) => {
     if (!activeLanguages.has(lang)) {
       activeLanguages.add(lang)
@@ -170,13 +150,27 @@ app.post('/start-processing', (req, res) => {
   })
 
   startProcessingStream(url)
-  setTimeout(() => {
-    axios.post('http://localhost:3002/start-streaming', {
-      languages: languages
-    })
-  }, 120000)
+  // setTimeout(() => {
+  //   axios.post('http://localhost:3002/start-streaming', {
+  //     languages: languages
+  //   })
+  // }, 60000)
   return res.json({ message: 'Processing started...' })
 })
+// app.post('/start-processing', (req, res) => {
+//   const { languages } = req.body
+
+//   if (!Array.isArray(languages) || languages.length === 0) {
+//     return res.status(400).json({ error: 'Languages array is required' })
+//   }
+
+//   activeLanguages = [...new Set(languages)] // Remove duplicates
+//   activeLanguages.forEach(connectWebSocket) // Establish WebSocket connections
+
+//   startProcessingStream()
+
+//   res.json({ message: 'Processing stream started' })
+// })
 
 // **Route: Process New Languages Mid-Stream**
 app.post('/process-new-languages', (req, res) => {
@@ -204,6 +198,17 @@ app.post('/process-new-languages', (req, res) => {
 
   console.log(`🔄 Processing new languages from chunk ${chunkIndex - 1}`)
   // res.json({ message: `Processing new languages: ${newLanguages.join(', ')}` })
+
+  // // Start processing from the previous chunk (if available)
+  // if (chunkIndex > 0 && chunksQueue.length > 2) {
+  //   newLanguages.forEach((language) =>
+  //     processChunks(
+  //       wsConnections,
+  //       chunksQueue[chunksQueue.length - 1],
+  //       language
+  //     )
+  //   )
+  // }
 
   res.json({ message: `Processing new languages: ${newLanguages.join(', ')}` })
 })
@@ -244,132 +249,3 @@ app.post('/stop-processing', (req, res) => {
 app.listen(PORT, () =>
   console.log(`🚀 Server running on http://localhost:${PORT}`)
 )
-
-// const fs = require('fs-extra')
-// const path = require('path')
-// const cors = require('cors')
-// const { processChunks } = require('./new_server')
-// const WebSocket = require('ws')
-// const express = require('express')
-// // const streamRoutes = require('./output_stream')
-// require('dotenv').config()
-// const { spawn } = require('child_process')
-// const { setupLanguageStream } = require('./watch_translation')
-
-// const app = express()
-// const PORT = 3001
-// app.use(cors())
-// const streamURL = 'rtp://127.0.0.1:1234'
-// const OUTPUT_FOLDER = path.join(__dirname, 'chunks')
-// const STREAM_BASE_DIR = path.join(__dirname, 'stream')
-// const CHUNK_DURATION = '10' // Seconds
-// const url = process.env.OPENAI_REALTIME_API_URL
-
-// // const languages = ['french', 'spanish', 'german'] // Add more as needed
-// const languages = ['french'] // Add more as needed
-// const wsConnections = {} // Store WebSocket instances per language
-
-// // Function to connect a WebSocket for each language
-// function connectWebSocket(language) {
-//   const ws = new WebSocket(url, {
-//     headers: {
-//       Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-//       'OpenAI-Beta': 'realtime=v1'
-//     }
-//   })
-
-//   ws.on('open', () => console.log(`Connected WebSocket for ${language}`))
-//   ws.on('close', () => {
-//     console.log(`WebSocket for ${language} disconnected. Reconnecting...`)
-//     setTimeout(() => connectWebSocket(language), 5000)
-//   })
-//   ws.on('error', (err) => console.error(`WebSocket error (${language}):`, err))
-
-//   wsConnections[language] = ws
-// }
-
-// // Initialize WebSockets per language
-// languages.forEach(connectWebSocket)
-
-// fs.ensureDirSync(OUTPUT_FOLDER)
-
-// let chunkIndex = 0
-// let chunksQueue = []
-// let isProcessing = false
-
-// const processStream = async () => {
-//   const segmentFile = path.join(OUTPUT_FOLDER, 'chunk_%03d.mp4')
-
-//   const ffmpegProcess = spawn('ffmpeg', [
-//     '-i',
-//     streamURL,
-//     '-c',
-//     'copy',
-//     '-flags',
-//     '+global_header',
-//     '-f',
-//     'segment',
-//     '-segment_time',
-//     CHUNK_DURATION,
-//     '-segment_format_options',
-//     'movflags=+faststart',
-//     '-reset_timestamps',
-//     '1',
-//     segmentFile
-//   ])
-
-//   ffmpegProcess.stdout.on('data', (data) =>
-//     console.log(`FFmpeg Output: ${data}`)
-//   )
-//   ffmpegProcess.stderr.on('data', (data) =>
-//     console.error(`FFmpeg Error: ${data}`)
-//   )
-//   ffmpegProcess.on('close', (code) =>
-//     console.log(`FFmpeg process exited with code ${code}`)
-//   )
-//   ffmpegProcess.on('error', (err) =>
-//     console.error(`Failed to start FFmpeg process: ${err.message}`)
-//   )
-// }
-
-// const processQueue = async () => {
-//   if (isProcessing || chunksQueue.length < 2) return
-
-//   isProcessing = true
-//   const chunk = chunksQueue.shift()
-
-//   // setTimeout(() => {
-//   //   languages.forEach((language) => {
-//   //     setupLanguageStream(language)
-//   //   })
-//   // }, 120000)
-
-//   await Promise.all(
-//     languages.map((language) =>
-//       processChunks(wsConnections[language], chunk, language)
-//     )
-//   )
-
-//   isProcessing = false
-//   chunkIndex++
-//   processQueue() // Continue processing the queue
-// }
-
-// fs.watch(OUTPUT_FOLDER, { persistent: true }, (eventType, filename) => {
-//   if (eventType === 'rename' && filename.endsWith('.mp4')) {
-//     chunksQueue.push(filename)
-//     processQueue()
-//   }
-// })
-
-// processStream()
-
-// app.use(express.static(STREAM_BASE_DIR))
-
-// /
-// app.use('/chunks', express.static(OUTPUT_FOLDER))
-// // app.use('/api', streamRoutes)
-
-// app.listen(PORT, () =>
-//   console.log(`🚀 Server running at http://127.0.0.1:${PORT}`)
-// )

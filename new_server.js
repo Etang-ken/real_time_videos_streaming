@@ -5,6 +5,7 @@ const { translateAudio } = require('./audio.js')
 
 const OUTPUT_FOLDER = path.join(__dirname, 'chunks') // Video chunks folder
 const AUDIO_FOLDER = path.join(__dirname, 'audios') // Translated audio folder
+const SUBTITLE_FOLDER = path.join(AUDIO_FOLDER, 'subtitles') // Translated audio folder
 
 const ensureDirExists = (dirPath) => {
   if (!fs.existsSync(dirPath)) {
@@ -27,17 +28,20 @@ const extractAudio = (inputVideo, outputAudio) => {
   })
 }
 
-const processChunks = async (ws, chunk, language) => {
+const processChunks = async (ws, chunk, language, extraParams) => {
   if (chunk.startsWith('translated_')) return // Skip already translated chunks
 
   const videoLanguageFolder = path.join(OUTPUT_FOLDER, language)
   const audioLanguageFolder = path.join(AUDIO_FOLDER, 'translations', language)
   const rawLanguageFolder = path.join(AUDIO_FOLDER, 'raw', language)
+  // const subtitleLanguageFolder = path.join(SUBTITLE_FOLDER, language)
+  const subtitleLanguageFolder = `audios/subtitles/${language}`
 
-  ensureDirExists(videoLanguageFolder);
-  ensureDirExists(audioLanguageFolder);
-  ensureDirExists(rawLanguageFolder);
-  
+  ensureDirExists(videoLanguageFolder)
+  ensureDirExists(audioLanguageFolder)
+  ensureDirExists(rawLanguageFolder)
+  ensureDirExists(subtitleLanguageFolder)
+
   const videoInput = path.join(OUTPUT_FOLDER, chunk)
   const audioPath = path.join(
     AUDIO_FOLDER,
@@ -52,6 +56,10 @@ const processChunks = async (ws, chunk, language) => {
     audioLanguageFolder,
     `translated_${chunk.replace('.mp4', '.aac')}`
   )
+  const subtitlePath = `${subtitleLanguageFolder}/sub_${chunk.replace(
+    '.mp4',
+    '.srt'
+  )}`
   const convertedChunk = `converted_audios/${chunk.replace('.mp4', '.wav')}`
   const finalVideoPath = path.join(videoLanguageFolder, `translated_${chunk}`)
 
@@ -65,7 +73,9 @@ const processChunks = async (ws, chunk, language) => {
       videoInput,
       finalVideoPath,
       convertedChunk,
-      outputRawFile
+      outputRawFile,
+      subtitlePath,
+      extraParams
     )
     console.log(`✅ Translation complete for chunk: ${chunk}`)
   } catch (error) {

@@ -28,7 +28,7 @@ app.post('/start-streaming', (req, res) => {
 })
 
 
-app.get('/:language', (req, res) => {
+app.get('/watch/:language', (req, res) => {
   const language = req.params.language
   res.send(`
         <html>

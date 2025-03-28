@@ -1,6 +1,8 @@
-const { execSync } = require('child_process')
+const { execSync, exec } = require('child_process')
 const ffmpeg = require('fluent-ffmpeg')
 const fs = require('fs')
+const path = require('path')
+const { default: axios } = require('axios')
 const getMediaDuration = (filePath) => {
   return new Promise((resolve, reject) => {
     ffmpeg.ffprobe(filePath, (err, metadata) => {
@@ -17,68 +19,231 @@ const mergeAudioWithVideo = async (
   originalAudio,
   videoChunk,
   translatedAudio,
-  outputVideo
+  outputVideo,
+  subtitlePath,
+  extraParams
 ) => {
+  console.log('⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️ extra params: ', extraParams)
   try {
     const audioDuration = await getMediaDuration(translatedAudio)
     console.log(`🔍 Translated audio duration: ${audioDuration} seconds`)
 
-    if (audioDuration < 5) {
-      console.log(
-        '⚠️ Translated audio is less than 5s. Storing original video instead.'
+    if (audioDuration < 4) {
+      console.log('⚠️ Translated audio is too short. Using original video.')
+      return mergeAudioWithVideo(
+        originalAudio,
+        videoChunk,
+        originalAudio,
+        outputVideo,
+        subtitlePath,
+        extraParams
       )
-      mergeAudioWithVideo(originalAudio, videoChunk, originalAudio, outputVideo)
-      // await transcodeVideo(outputVideo, outputVideo);
-      return // Return original video
     }
 
     return new Promise((resolve, reject) => {
+      const originalAudioVolume = extraParams.addOriginalVoice
+        ? parseInt(extraParams.addOriginalVoice) / 10
+        : 0
       ffmpeg()
         .input(videoChunk)
         .input(translatedAudio)
+        .input(originalAudio)
         .output(outputVideo)
-        .videoCodec('copy')
+        .videoCodec('copy') // Keep the original video codec
         .audioCodec('aac')
-        .outputOptions(['-map 0:v:0', '-map 1:a:0', '-shortest'])
-        .on('end', () => {
+        .complexFilter([
+          `[2:a]volume=${originalAudioVolume}[original_audio]`,
+          '[1:a][original_audio]amix=inputs=2:duration=longest[mixed_audio]'
+        ])
+        .outputOptions([
+          '-map 0:v:0', // Keep original video stream
+          '-map [mixed_audio]', // Use mixed audio stream
+          '-shortest'
+        ])
+        .on('end', async () => {
           console.log(`✅ Merged Video: ${outputVideo}`)
-          resolve(outputVideo)
-        })
-        .on('error', (err) => {
-          // console.error('❌ Merging Video Error:', err);
-          // console.log('⚠️ Returning original video due to audio merge failure:', videoChunk);
-          // fs.copyFileSync(videoChunk, outputVideo);
-          // reject(err);
 
-          console.error('❌Merged Video error: ', err)
+          // Step 2: Add Subtitles as an Overlay Efficiently
+
+          // streamVideo('french', outputVideo)
+          const finalVideo = outputVideo.replace('.mp4', '_subtitled.mp4')
+          if (extraParams.addSubtitles) {
+            await addSubtitlesOverlay(outputVideo, subtitlePath, finalVideo)
+          } else {
+            fs.copyFileSync(outputVideo, finalVideo)
+          }
+
+          resolve(finalVideo)
+        })
+        .on('error', async (err) => {
+          console.error('❌ Merging Video Error:', err)
           if (err.message.includes('ffmpeg exited with code 187')) {
             console.log(
               'Returning original video due to audio merge failure:',
+
               videoChunk
             )
+
             // fs.copyFileSync(videoChunk, outputVideo);
-            mergeAudioWithVideo(
+
+            await mergeAudioWithVideo(
               originalAudio,
               videoChunk,
               originalAudio,
-              outputVideo
+              outputVideo,
+              subtitlePath,
+              extraParams
             )
-            return
-            // Transcode the copied video to the desired properties
-            // transcodeVideo(outputVideo, outputVideo)
-            //   .then(() => resolve(outputVideo))
-            //   .catch((err) => reject(err))
           }
-
-          return
+          resolve(err)
         })
         .run()
     })
   } catch (err) {
-    console.error('❌ Error checking audio duration:', err)
+    console.error('❌ Error processing video:', err)
     throw err
   }
 }
+
+// Function to overlay subtitles without re-encoding the video
+const addSubtitlesOverlay = (inputVideo, subtitleFile, outputVideo) => {
+  return new Promise((resolve, reject) => {
+    ffmpeg(inputVideo)
+      .input(subtitleFile)
+      .outputOptions([
+        '-c:v libx264', // Ensure compatibility
+        '-preset ultrafast', // Speed up processing
+        '-vf',
+        `subtitles=${subtitleFile}:force_style='FontName=Arial,FontSize=14,PrimaryColour=&HFFFFFF,OutlineColour=&H000000,BorderStyle=3,Outline=1,Shadow=0,MarginV=20'`,
+        '-c:a copy' // Copy audio to save processing time
+      ])
+      .output(outputVideo)
+      .on('end', () => {
+        console.log(`✅ Subtitled Video: ${outputVideo}`)
+        // streamVideo('french', outputVideo)
+        // setTimeout(async () => {
+        //   await axios.post('http://localhost:3002/stream-vid', {
+        //     videoPath: outputVideo,
+        //     language: 'french'
+        //   })
+        // }, 3000)
+        resolve(outputVideo)
+      })
+      .on('error', (err) => {
+        try {
+          fs.copyFileSync(inputVideo, outputVideo)
+
+          console.log(
+            `✅ Copied original video to ${outputVideo} due to subtitle error`
+          )
+          resolve(outputVideo)
+        } catch (copyErr) {
+          console.error('❌ Error copying original video:', copyErr)
+          resolve(null)
+        }
+      })
+      .run()
+  })
+}
+
+// const mergeAudioWithVideo = async (
+//   originalAudio,
+//   videoChunk,
+//   translatedAudio,
+//   outputVideo,
+//   subtitlePath
+// ) => {
+//   try {
+//     const audioDuration = await getMediaDuration(translatedAudio)
+//     console.log(`🔍 Translated audio duration: ${audioDuration} seconds`)
+
+//     if (audioDuration < 4) {
+//       console.log(
+//         '⚠️ Translated audio is less than 5s. Storing original video instead.'
+//       )
+//       mergeAudioWithVideo(
+//         originalAudio,
+//         videoChunk,
+//         originalAudio,
+//         outputVideo,
+//         subtitlePath
+//       )
+//       // await transcodeVideo(outputVideo, outputVideo);
+//       return // Return original video
+//     }
+
+//     return new Promise((resolve, reject) => {
+//      const command = ffmpeg()
+//         .input(videoChunk)
+//         .input(translatedAudio)
+//         .output(outputVideo)
+//         .videoCodec('libx264')
+//         .audioCodec('aac')
+//         .outputOptions([
+//           // '-map 0:v:0',
+//           // '-map 1:a:0',
+//           // '-map 2',
+//           // '-c:s mov_text',
+//           // '-disposition:s:0 default',
+//           // '-shortest'
+//           '-map 1:a:0', // Audio stream from the second input
+//           '-shortest'
+//         ])
+//         command.complexFilter([
+//           {
+//             filter: 'subtitles',
+//             options: subtitlePath.replace(/\\/g, '/'), // Burn subtitles into the video
+//             inputs: '0:v:0', // Apply to the first video stream
+//             outputs: 'subtitled_video' // Output of the filter
+//           }
+//         ]);
+
+//         // Map the output of the filter to the final video stream
+//         command.outputOptions(['-map [subtitled_video]']);
+//         command.on('end', () => {
+//           console.log(`✅ Merged Video: ${outputVideo}`)
+//           resolve(outputVideo)
+//         })
+//         .on('error', async (err) => {
+//           // console.error('❌ Merging Video Error:', err);
+//           // console.log('⚠️ Returning original video due to audio merge failure:', videoChunk);
+//           // fs.copyFileSync(videoChunk, outputVideo);
+//           // reject(err);
+
+//           console.error('❌Merged Video error: ', err)
+//           if (err.message.includes('ffmpeg exited with code 187')) {
+//             console.log(
+//               'Returning original video due to audio merge failure:',
+//               videoChunk
+//             )
+//             // fs.copyFileSync(videoChunk, outputVideo);
+//             try {
+//               const fallbackVideo = await mergeAudioWithVideo(
+//                 originalAudio,
+//                 videoChunk,
+//                 originalAudio,
+//                 outputVideo,
+//                 subtitlePath
+//               )
+//               resolve(fallbackVideo)
+//             } catch (fallbackErr) {
+//               resolve(null)
+//             }
+//             // Transcode the copied video to the desired properties
+//             // transcodeVideo(outputVideo, outputVideo)
+//             //   .then(() => resolve(outputVideo))
+//             //   .catch((err) => reject(err))
+//           }
+
+//           return
+//         })
+//         .run()
+//     })
+//   } catch (err) {
+//     console.error('❌ Error checking audio duration:', err)
+//     throw err
+//   }
+// }
 
 // Function to transcode video to desired properties
 const transcodeVideo = (inputVideo, outputVideo) => {
@@ -114,7 +279,9 @@ const translateAudio = async (
   videoChunkPath,
   finalVideoPath,
   tempWavPath,
-  outputRawFile
+  outputRawFile,
+  subtitlePath,
+  extraParams
 ) => {
   return new Promise((resolve, reject) => {
     try {
@@ -162,7 +329,7 @@ const translateAudio = async (
     const handleMessage = (message) => {
       const serverEvent = JSON.parse(message.toString())
       // console.log('✅ Server Event: ', serverEvent)
-      
+
       if (serverEvent.type === 'response.audio.delta' && serverEvent.delta)
         receivedAudioChunks.push(serverEvent.delta)
       if (serverEvent.type === 'response.audio_transcript.done') {
@@ -185,9 +352,14 @@ const translateAudio = async (
             processedOriginalAudio,
             videoChunkPath,
             processedOriginalAudio,
-            finalVideoPath
+            finalVideoPath,
+            subtitlePath,
+            extraParams
           )
         }
+        // Write transcript to SRT file
+        const srtContent = `1\n00:00:00,000 --> 00:00:10,000\n${serverEvent.transcript}`
+        fs.writeFileSync(subtitlePath, srtContent)
         // return fs.copyFileSync(videoChunkPath, finalVideoPath)
       }
       if (serverEvent.type === 'response.done') {
@@ -209,9 +381,15 @@ const translateAudio = async (
               processedOriginalAudio,
               videoChunkPath,
               translatedAudioPath,
-              finalVideoPath
+              finalVideoPath,
+              subtitlePath,
+              extraParams
             )
               .then(() => {
+                // execSync(`ffmpeg -i ${finalVideoPath} -i ${subtitlePath} -c:v copy -c:a copy -c:s mov_text ${finalVideoPath}`)
+                execSync(
+                  `ffmpeg -i ${finalVideoPath} -vf "subtitles=${subtitlePath}" -c:v libx264 -c:a aac -shortest ${finalVideoPath}`
+                )
                 if (fs.existsSync(outputRawFile)) fs.unlinkSync(outputRawFile)
                 ws.off('message', handleMessage)
                 resolve()
@@ -252,7 +430,9 @@ const translateAudio = async (
           processedOriginalAudio,
           videoChunkPath,
           processedOriginalAudio,
-          finalVideoPath
+          finalVideoPath,
+          subtitlePath,
+          extraParams
         )
           .then(resolve)
           .catch(reject)
@@ -260,21 +440,21 @@ const translateAudio = async (
       }
     }, 60000)
 
-    const sessionRefreshInterval = 25 * 60 * 1000 // 25 minutes
-    const sessionRefresh = setInterval(() => {
-      const refreshEvent = {
-        type: 'session.update',
-        session: {
-          instructions: 'Continue translation.'
-        }
-      }
-      ws.send(JSON.stringify(refreshEvent))
-      console.log('Session refreshed.')
-    }, sessionRefreshInterval)
+    // const sessionRefreshInterval = 3 * 60 * 1000 // 25 minutes
+    // const sessionRefresh = setInterval(() => {
+    //   const refreshEvent = {
+    //     type: 'session.update',
+    //     session: {
+    //       instructions: 'Continue translation.'
+    //     }
+    //   }
+    //   ws.send(JSON.stringify(refreshEvent))
+    //   console.log('🔄 Session refreshed.')
+    // }, sessionRefreshInterval)
 
     const cleanup = () => {
       clearTimeout(timeout)
-      clearInterval(sessionRefresh)
+      // clearInterval(sessionRefresh)
       ws.off('message', handleMessage)
     }
 
